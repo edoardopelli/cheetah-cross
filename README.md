@@ -1,5 +1,5 @@
 
-# 🐆 CheetahCutOrStitch (CCoS)
+# 🐆 Cheetah Reliable Operation for Splitting & Stitching (CROSS)
 
 `CheetahCutOrStitch` is a powerful and fast **Spring Boot CLI** application designed to:
 
