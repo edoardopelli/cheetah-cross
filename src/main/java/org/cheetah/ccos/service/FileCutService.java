@@ -2,6 +2,7 @@ package org.cheetah.ccos.service;
 
 import org.cheetah.ccos.cli.FileOperationParams;
 import org.cheetah.ccos.model.FilePart;
+import org.cheetah.ccos.repository.FileMetadataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -26,12 +27,14 @@ public class FileCutService {
             long chunkSize = params.getChunkSize();
             long fileSize = Files.size(inputFile);
 
-            // Calcolo del numero totale di parti
+            // Generate hash from file content
+            String fileHash = generateContentHash(inputFile);
+            System.out.println("Generated Content Hash: " + fileHash);
+
+            // Calculate total parts and padding
             long totalParts = (fileSize + chunkSize - 1) / chunkSize;
             int paddingLength = String.valueOf(totalParts).length();
 
-            // Calcolo dell'hash del nome del file
-            String fileHash = generateFileHash(inputFile.getFileName().toString());
             List<FilePart> parts = new ArrayList<>();
 
             try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(inputFile.toFile()))) {
@@ -47,31 +50,36 @@ public class FileCutService {
                     try (FileOutputStream out = new FileOutputStream(newFile.toFile())) {
                         out.write(buffer, 0, bytesRead);
                         parts.add(new FilePart(newFileName, bytesRead));
-                        System.out.println("Creato: " + newFile);
+                        System.out.println("Created part: " + newFileName);
                     }
 
                     partCounter++;
                 }
             }
 
-            // Salvataggio dei metadati in MongoDB
+            // Save metadata to MongoDB
             metadataService.saveFileMetadata(fileHash, inputFile.getFileName().toString(), fileSize, parts);
 
-            System.out.println("Operazione di cut completata e metadati salvati su MongoDB!");
+            System.out.println("✅ Cut operation completed and metadata saved to MongoDB!");
 
         } catch (IOException e) {
-            System.err.println("Errore durante lo split del file: " + e.getMessage());
+            System.err.println("❌ Error during file splitting: " + e.getMessage());
         }
     }
 
-    private String generateFileHash(String fileName) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] hashBytes = md.digest(fileName.getBytes());
-            BigInteger bigInt = new BigInteger(1, hashBytes);
-            return bigInt.toString(16);
+    private String generateContentHash(Path file) {
+        try (InputStream fis = Files.newInputStream(file)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] byteArray = new byte[1024];
+            int bytesCount;
+            while ((bytesCount = fis.read(byteArray)) != -1) {
+                digest.update(byteArray, 0, bytesCount);
+            }
+            byte[] bytes = digest.digest();
+            BigInteger no = new BigInteger(1, bytes);
+            return no.toString(16);
         } catch (Exception e) {
-            throw new RuntimeException("Errore nella generazione dell'hash: " + e.getMessage());
+            throw new RuntimeException("Error generating content hash: " + e.getMessage());
         }
     }
 }
